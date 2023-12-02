@@ -1,85 +1,104 @@
 require 'csv'
 
 class MemoApp
-  def initialize
+  def initialize(file_path)
+    @file_path = file_path
     @memos = load_memos_from_csv
     start_app
   end
 
-  #初期画面　メニュー選択
   def start_app
     loop do
-      puts "\nメモアプリ"
-      puts "1. 新規のメモを追加する"
-      puts "2. メモの一覧"
-      puts "3. 既存のメモを編集する"
-      puts "4. メモを保存する"
-      print "選択: "
-      choice = gets.chomp.to_i    #選択された数字を入力された数字を数値オブジェクトとして受け取り変数choiceに代入
+      display_menu
+      choice = get_user_choice
 
-      case choice     #選択されてた数字に合わせて以下のメソッドに移る
-      when 1
-        add_memo
-      when 2
-        display_memos
-      when 3
-        edit_memo
-      when 4
-        save_memos_to_csv
-        break
+      case choice
+      when 1 then add_memo
+      when 2 then display_memos
+      when 3 then edit_memo
+      when 4 then save_memos_to_csv; break
       else
-        puts "1.2.3.4のいずれかのボタンを押してください"
+        puts "1から4の数字を入力してください。"
       end
     end
   end
 
+  def display_menu
+    puts "\nメモアプリ"
+    puts "1. 新規のメモを追加する"
+    puts "2. メモの一覧"
+    puts "3. 既存のメモを編集する"
+    puts "4. メモを保存して終了する"
+    print "選択: "
+  end
+
+  def get_user_choice
+    gets.chomp.to_i
+  end
+
   def add_memo
-    print "メモを入力してください: "
-    memo = gets.chomp     #ユーザーからの入力を変数memoに代入
-    @memos << memo     #@memoの配列にmemoの内容を追加する
+    puts "メモを入力してください。複数行の場合は最後に空行を入力してください。"
+    memo = read_multiline_input     #以下のread_multiline_inputメソッドでのメモの入力内容を代入している
+    @memos << memo unless memo.empty?     #ユーザーが何かしらのテキストを入力している場合、@memosの配列にmemoを追加する。
+  end
+
+  def read_multiline_input
+    lines = []
+    loop do     #行を読み込み続けてる
+      line = gets.chomp     #入力されたメモの内容を変数に代入
+      break if line.empty?     #lineが空になる（エンターキーが2回連続で押される）まで処理をループする
+      lines << line     #ユーザーに入力されたメモがenterごとに配列linesに入る
+    end
+    lines.join("\n")     #改行で結合する
   end
 
   def display_memos
-    if @memos.empty?     #まだ要素がない時の処理
+    if @memos.empty?
       puts "メモはありません。"
-    else     #要素がある時の処理
+    else
       puts "メモ一覧:"
-      @memos.each_with_index do |memo, index|     #配列内にある要素を繰り返し処理で取り出す
-        puts "#{index + 1}. #{memo}"     #配列の番号（index）に１を足した数がメモの番号となる
-      end
+      @memos.each_with_index { |memo, index| puts "#{index + 1}. #{memo}" }
     end
   end
 
   def edit_memo
-    display_memos     #メモの一覧を表示させて
-    print "編集するメモの番号を入力してください: "     
-    index = gets.chomp.to_i - 1     #入力された番号から−1された数字が配列内の
+    display_memos
+    index = get_memo_index
 
-    if index >= 0 && index < @memos.length     #①indexが0以上で、メモの数以内の時
-      print "新しいメモを入力してください: "     
-      new_memo = gets.chomp     #新規で入力されたメモを変数new_memoに代入し
-      @memos[index] = new_memo     #指定されたindexの要素を更新する
+    if valid_index?(index)     #有効な範囲内であれば
+      new_memo = read_multiline_input     #read_multiline_inputを呼び出し乳卯力された内容を変数new_memoに代入する
+      @memos[index] = new_memo     #指定のインデックスのmemoにread_multiline_inputで入力された内容を追加する
       puts "メモを編集しました。"
-    else     #①の条件を満たさないとき以下の処理となる
+    else
       puts "無効な番号です。再度入力してください。"
     end
   end
 
-  def save_memos_to_csv
-  CSV.open('test.csv', 'w') do |csv|     #CSVファイルを書き込みモードを開き
-      @memos.each { |memo| csv << [memo] }     #@memosの要素を繰り返し処理しCSVに書き込んでいく
-    end
+  def get_memo_index
+    print "編集するメモの番号を入力してください: "
+    gets.chomp.to_i - 1     #入力された数字の−1はインデックス番号
   end
 
-  def load_memos_from_csv     #CSVファイルからメモを読み込んで配列に格納する
-    memos = []     #空の配列 memos を作成して、この配列にCSVファイルから読み込んだメモが格納される
-    if File.exist?('test.csv')     #test.csvが存在した場合
-      CSV.foreach('test.csv') { |row| memos << row[0] }     #各行の最初（row0）を行ごとに取得して
+  def valid_index?(index)
+    index >= 0 && index < @memos.length
+  end
+
+  def save_memos_to_csv
+    CSV.open(@file_path, 'w', encoding: 'UTF-8', force_quotes: false) do |csv|     
+      @memos.each { |memo| csv << [memo] }
+    end
+    puts "メモを保存しました。アプリを終了します。"
+  end  
+
+  def load_memos_from_csv
+    memos = []
+    if File.exist?(@file_path)
+      CSV.foreach(@file_path) { |row| memos << row[0] }
     end
     memos
   end
 end
 
-# インスタンスの生成とメモアプリの開始
-MemoApp.new
-
+puts "保存するファイル名を入力してください:"
+file_path = gets.chomp + ".csv"
+MemoApp.new(file_path)
